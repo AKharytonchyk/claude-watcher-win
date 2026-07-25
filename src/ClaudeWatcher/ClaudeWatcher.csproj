@@ -15,6 +15,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <!-- H.NotifyIcon.WinUI is pinned: 2.4.0+ dropped net8 (requires net10). 2.3.0

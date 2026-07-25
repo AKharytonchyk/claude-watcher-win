@@ -11,16 +11,19 @@ namespace ClaudeWatcher.Platform;
 /// dance Windows requires). WSL sessions have a Linux pid that maps to no Windows
 /// window, so they no-op.
 ///
+/// Uses classic <c>[DllImport]</c> (not <c>[LibraryImport]</c>): the source
+/// generator rejects <c>PROCESSENTRY32</c>'s inline string field (SYSLIB1051)
+/// and would require unsafe code.
+///
 /// UNVERIFIED (Windows-only).
 /// </summary>
-public static partial class TerminalFocus
+public static class TerminalFocus
 {
     /// <summary>Returns true if a hosting window was found and foregrounded.</summary>
     public static bool Focus(int pid, string rootId)
     {
         if (rootId.StartsWith("wsl:", StringComparison.Ordinal)) return false; // no Windows window
-        var ancestry = Ancestry(pid);
-        foreach (var candidate in ancestry)
+        foreach (var candidate in Ancestry(pid))
         {
             var hwnd = MainWindowFor(candidate);
             if (hwnd != IntPtr.Zero) return Foreground(hwnd);
@@ -32,12 +35,18 @@ public static partial class TerminalFocus
     private static List<int> Ancestry(int pid)
     {
         var parent = new Dictionary<int, int>();
-        try
+        var snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snap != IntPtr.Zero && snap != new IntPtr(-1))
         {
-            using var snap = new Snapshot();
-            foreach (var (child, par) in snap.Pairs()) parent[child] = par;
+            try
+            {
+                var e = new PROCESSENTRY32 { dwSize = (uint)Marshal.SizeOf<PROCESSENTRY32>() };
+                if (Process32First(snap, ref e))
+                    do { parent[(int)e.th32ProcessID] = (int)e.th32ParentProcessID; }
+                    while (Process32Next(snap, ref e));
+            }
+            finally { CloseHandle(snap); }
         }
-        catch { /* best effort */ }
 
         var chain = new List<int>();
         var cur = pid;
@@ -59,7 +68,7 @@ public static partial class TerminalFocus
             if (p.MainWindowHandle != IntPtr.Zero && IsWindowVisible(p.MainWindowHandle))
                 return p.MainWindowHandle;
         }
-        catch { }
+        catch { /* process gone / access denied */ }
 
         // Fallback: first visible top-level window owned by this pid.
         IntPtr found = IntPtr.Zero;
@@ -90,26 +99,11 @@ public static partial class TerminalFocus
         return ok;
     }
 
-    // MARK: - Toolhelp snapshot
+    // MARK: - Interop
 
-    private sealed class Snapshot : IDisposable
-    {
-        private const uint TH32CS_SNAPPROCESS = 0x00000002;
-        private readonly IntPtr _h;
-        public Snapshot() => _h = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    private const uint TH32CS_SNAPPROCESS = 0x00000002;
 
-        public IEnumerable<(int Pid, int Parent)> Pairs()
-        {
-            var e = new PROCESSENTRY32 { dwSize = (uint)Marshal.SizeOf<PROCESSENTRY32>() };
-            if (!Process32First(_h, ref e)) yield break;
-            do { yield return ((int)e.th32ProcessID, (int)e.th32ParentProcessID); }
-            while (Process32Next(_h, ref e));
-        }
-
-        public void Dispose() { if (_h != IntPtr.Zero && _h != new IntPtr(-1)) CloseHandle(_h); }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct PROCESSENTRY32
     {
         public uint dwSize;
@@ -126,37 +120,29 @@ public static partial class TerminalFocus
 
     private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
 
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    private static partial IntPtr CreateToolhelp32Snapshot(uint flags, uint processId);
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool Process32First(IntPtr snapshot, ref PROCESSENTRY32 entry);
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool Process32Next(IntPtr snapshot, ref PROCESSENTRY32 entry);
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool CloseHandle(IntPtr h);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint processId);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool Process32First(IntPtr snapshot, ref PROCESSENTRY32 entry);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool Process32Next(IntPtr snapshot, ref PROCESSENTRY32 entry);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr h);
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
-    [LibraryImport("user32.dll", SetLastError = true)]
-    private static partial uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool IsWindowVisible(IntPtr hwnd);
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool IsIconic(IntPtr hwnd);
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool ShowWindow(IntPtr hwnd, int cmd);
-    [LibraryImport("user32.dll")]
-    private static partial IntPtr GetForegroundWindow();
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SetForegroundWindow(IntPtr hwnd);
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool AttachThreadInput(uint attach, uint attachTo, [MarshalAs(UnmanagedType.Bool)] bool fAttach);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hwnd);
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hwnd);
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hwnd, int cmd);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint attach, uint attachTo, bool fAttach);
 }
