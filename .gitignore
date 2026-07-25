@@ -1,0 +1,36 @@
+# Build products
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+artifacts/
+publish/
+*.msix
+*.appx
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.DotSettings.user
+
+# VS Code
+.vscode/
+
+# NuGet
+*.nupkg
+packages/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local tooling / editor config (not part of the product)
+.entire/
+
+# Claude Code: commit the Spec Kit workflow (.claude/skills, .claude/commands),
+# but never the local/agent-private bits.
+.claude/settings.local.json
+.claude/*.local.json
+.claude/.credentials*

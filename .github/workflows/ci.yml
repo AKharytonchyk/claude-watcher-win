@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  core:
+    name: Core (build + test, cross-platform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet test tests/ClaudeWatcher.Core.Tests/ClaudeWatcher.Core.Tests.csproj -c Release
+
+  windows:
+    name: Windows app (build)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      # WinUI 3 (Windows App SDK) restores its tooling via NuGet for unpackaged
+      # apps — no workload install needed. Build the app for x64 (its only
+      # configured platforms are x64/arm64, so pass Platform explicitly).
+      - run: dotnet build src/ClaudeWatcher/ClaudeWatcher.csproj -c Release -p:Platform=x64
+      - run: dotnet test tests/ClaudeWatcher.Core.Tests/ClaudeWatcher.Core.Tests.csproj -c Release
