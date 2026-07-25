@@ -52,8 +52,9 @@ src/ClaudeWatcher/        # WinUI 3 app — net8.0-windows, references Core
 tests/ClaudeWatcher.Core.Tests/   # xUnit over Core (builds/runs off-Windows too)
 ```
 
-**Status legend:** `tested` = builds + unit-tested on macOS · `unverified` =
-written but only compilable on Windows (WinUI/Win32) — CI is the first check.
+**Status legend:** `tested` = builds + unit-tested (macOS/CI) · `unverified` =
+compiles on `windows-latest` CI but not yet run on a real desktop (runtime
+behavior unverified).
 
 | File | Purpose | Status |
 |------|---------|--------|

@@ -12,10 +12,10 @@ at a glance, from anywhere on your desktop. The Windows sibling of
   the macOS app — see [CONSTITUTION.md](CONSTITUTION.md) and [PRIVACY.md](PRIVACY.md).
 
 > **Status: pre-alpha.** The pure-logic **Core is complete and tested** (39 unit
-> tests, green on cross-platform CI). The Windows app layers — tray, acrylic
-> flyout, WSL discovery, watcher, window focus — are **written but unverified**:
-> they only compile on Windows, so the `windows-latest` CI job is the first real
-> check. Not a shippable app yet. See
+> tests). The whole solution — Core **and** the WinUI app — now **builds green on
+> CI** (`windows-latest`). What's left is **runtime** verification: the tray glyph,
+> flyout, WSL discovery, watcher, and window focus compile but haven't been run on
+> a real Windows desktop yet. Not a shippable app yet. See
 > [`specs/0001-windows-tray-mvp.md`](specs/0001-windows-tray-mvp.md) for the plan
 > and [AGENTS.md](AGENTS.md) for the per-file `tested` vs. `unverified` status.
 

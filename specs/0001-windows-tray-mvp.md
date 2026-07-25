@@ -7,9 +7,10 @@
 
 
 - **Status:** in progress — **Core complete + tested** (39 unit tests). Phases
-  1–3 drafted in code (WSL discovery, native watcher + WSL polling, tray render,
-  acrylic flyout, Win32 window focus) but **unverified** — they compile only on
-  Windows; awaiting a Windows build (CI `windows-latest` + local). `PrChecker`
+  1–3 implemented and now **build green on CI** (`windows-latest`): WSL discovery,
+  native watcher + WSL polling, tray render, acrylic flyout, Win32 window focus.
+  **Runtime unverified** — pending a real Windows desktop (launch the tray, open
+  the flyout, confirm native + WSL sessions appear and update). `PrChecker`
   remains a stub.
 - **Owner:** —
 - **Gate:** Phase 2 (WSL) must prove that (a) a distro's `~/.claude/sessions` is
