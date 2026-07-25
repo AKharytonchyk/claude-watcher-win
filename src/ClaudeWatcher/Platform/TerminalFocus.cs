@@ -74,7 +74,7 @@ public static class TerminalFocus
         IntPtr found = IntPtr.Zero;
         EnumWindows((hwnd, _) =>
         {
-            _ = GetWindowThreadProcessId(hwnd, out var wpid);
+            GetWindowThreadProcessId(hwnd, out var wpid);
             if (wpid == (uint)pid && IsWindowVisible(hwnd))
             {
                 found = hwnd;
