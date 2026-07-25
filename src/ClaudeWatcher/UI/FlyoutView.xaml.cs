@@ -1,0 +1,39 @@
+using ClaudeWatcher.Core;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+
+namespace ClaudeWatcher.UI;
+
+/// <summary>
+/// The flyout's content (a FrameworkElement so x:Bind works — a Window is not a
+/// FrameworkElement). Hosted by <see cref="FlyoutWindow"/>.
+///
+/// UNVERIFIED (Windows-only).
+/// </summary>
+public sealed partial class FlyoutView : UserControl
+{
+    public FleetViewModel VM { get; }
+    private readonly Action<AgentView> _onOpen;
+
+    /// <summary>Raised after the user acts on a row, so the host can dismiss.</summary>
+    public event Action? CloseRequested;
+
+    public FlyoutView(FleetViewModel vm, Action<AgentView> onOpen)
+    {
+        VM = vm;
+        _onOpen = onOpen;
+        InitializeComponent();
+    }
+
+    private void OnItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is AgentView agent)
+        {
+            _onOpen(agent);
+            CloseRequested?.Invoke();
+        }
+    }
+
+    private void OnQuit(object sender, RoutedEventArgs e) =>
+        (Application.Current as App)?.Quit();
+}
