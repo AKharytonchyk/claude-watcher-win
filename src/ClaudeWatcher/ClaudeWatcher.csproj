@@ -17,12 +17,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-  <!-- Versions are indicative — run `dotnet restore` on Windows and bump to the
-       latest stable if a version is not found. -->
+  <!-- H.NotifyIcon.WinUI is pinned: 2.4.0+ dropped net8 (requires net10). 2.3.0
+       is the newest stable that supports net8.0-windows10.0.17763 (compatible
+       with our 19041 target). Bump alongside a net10 retarget if we ever move. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.*" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.*" />
-    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.*" />
+    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.3.0" />
   </ItemGroup>
 
   <ItemGroup>
