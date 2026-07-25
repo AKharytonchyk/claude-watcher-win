@@ -40,7 +40,17 @@ Requires the .NET 8 SDK and the Windows App SDK workload. See
 Claude Code writes a small JSON file per live session under `~/.claude/sessions`.
 That schema — the contract this app reads — is documented in
 [SCHEMA.md](SCHEMA.md) and is identical across macOS, Windows, and WSL. Keep it in
-sync with the macOS repo.
+sync with the [macOS repo](https://github.com/AKharytonchyk/claude-watcher).
+
+## Related
+
+- **macOS:** [AKharytonchyk/claude-watcher](https://github.com/AKharytonchyk/claude-watcher)
+  — the original menu-bar app this is a sibling of. Same principles
+  ([CONSTITUTION](CONSTITUTION.md)) and the same read-only session-file contract
+  ([SCHEMA](SCHEMA.md)); the pure-logic core here is a port of its Swift model.
+
+> The reciprocal link (macOS repo → this one) will be added once the Windows app
+> is confirmed running on a real desktop.
 
 ## License
 

@@ -2,8 +2,10 @@
 
 This is the data contract Claude Watcher reads. It is written by Claude Code, not
 by us, and is **identical across macOS, Windows, and WSL**. This file is the
-shared source of truth between the macOS and Windows apps — if Claude Code's
-format changes, update this file and both readers together.
+shared source of truth between the macOS app
+([AKharytonchyk/claude-watcher](https://github.com/AKharytonchyk/claude-watcher))
+and this Windows app — if Claude Code's format changes, update this file and both
+readers together.
 
 We read this data **read-only**. We never write to `~/.claude`.
 
