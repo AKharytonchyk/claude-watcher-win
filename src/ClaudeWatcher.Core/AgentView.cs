@@ -45,6 +45,8 @@ public sealed record AgentView
 
     /// <summary>Pill label, e.g. "#138" — empty when there's no PR, so the pill hides.</summary>
     public string PrText => Pr is null ? "" : $"#{Pr.Number}";
+
+    public string PrTooltip => Pr is null ? "" : $"Open pull request #{Pr.Number}{(Pr.IsDraft ? " (draft)" : "")}";
     public string? ModelLabel { get; init; }          // "Opus 4.8"
     public int? ContextTokens { get; init; }
     public int? ContextWindow { get; init; }

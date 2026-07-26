@@ -116,13 +116,17 @@
                                 <TextBlock Text="{x:Bind Location}" FontSize="11"
                                            MaxWidth="205" TextTrimming="CharacterEllipsis"
                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                <!-- open PR for this branch, when there is one -->
-                                <Border CornerRadius="9" Padding="6,1" BorderThickness="1"
+                                <!-- open PR for this branch: click to open it in the browser.
+                                     A Button (not a Border) so the click is swallowed here
+                                     instead of also firing the row's focus-the-terminal. -->
+                                <Button Click="OnPrClick" CornerRadius="9" Padding="6,1"
+                                        MinWidth="0" MinHeight="0" BorderThickness="1"
                                         BorderBrush="#4D30A46C" Background="#1A30A46C"
+                                        ToolTipService.ToolTip="{x:Bind PrTooltip}"
                                         Visibility="{x:Bind PrText, Converter={StaticResource StrVis}}">
                                     <TextBlock Text="{x:Bind PrText}" FontSize="10.5" FontWeight="SemiBold"
                                                Foreground="#3FBF7F" />
-                                </Border>
+                                </Button>
 
                                 <TextBlock Text="{x:Bind ContextPct, Converter={StaticResource Pct}}" FontSize="11"
                                            FontWeight="SemiBold"

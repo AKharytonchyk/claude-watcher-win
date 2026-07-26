@@ -34,6 +34,17 @@ public sealed partial class FlyoutView : UserControl
         }
     }
 
+    /// <summary>
+    /// The PR pill was clicked: open it in the browser and dismiss, the same way acting
+    /// on a row does. The row's own click never runs — the Button consumes it.
+    /// </summary>
+    private void OnPrClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: AgentView agent } && agent.Pr is { } pr &&
+            Platform.Browser.Open(pr.Url))
+            CloseRequested?.Invoke();
+    }
+
     /// <summary>A header pill was clicked: filter that state in or out of the list.</summary>
     private void OnPillClick(object sender, RoutedEventArgs e)
     {
