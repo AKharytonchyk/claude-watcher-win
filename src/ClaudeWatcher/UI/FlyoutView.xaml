@@ -14,7 +14,9 @@
         <ui:StringToVisibilityConverter x:Key="StrVis" />
     </UserControl.Resources>
 
-    <Grid x:Name="Root" Width="368" Background="{ThemeResource LayerFillColorDefaultBrush}">
+    <!-- No fixed Width: the window defines it, and pinning the content narrower than the
+         window left a strip of bare window showing down one side. -->
+    <Grid x:Name="Root" Background="{ThemeResource LayerFillColorDefaultBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -72,7 +74,7 @@
                   IsItemClickEnabled="True" ItemClick="OnItemClick"
                   SelectionMode="None" Padding="6,4"
                   Visibility="{x:Bind VM.IsEmpty, Mode=OneWay, Converter={StaticResource BoolVis}, ConverterParameter=invert}"
-                  MaxHeight="440">
+                  MaxHeight="620">
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <Setter Property="Padding" Value="8,7" />
@@ -92,35 +94,51 @@
                                  Fill="{x:Bind State, Converter={StaticResource StateBrush}}" />
 
                         <StackPanel Grid.Column="1" Spacing="2">
-                            <!-- name  ·  state · elapsed -->
-                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                <TextBlock Text="{x:Bind Name}" FontSize="14" FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock FontSize="11.5" VerticalAlignment="Center"
+                            <!-- name · state · elapsed. A Grid so a long agent name
+                                 ellipsises instead of shoving the state off the row. -->
+                            <Grid ColumnSpacing="7">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{x:Bind Name}" FontSize="14"
+                                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" FontSize="11.5" VerticalAlignment="Center"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
                                     <Run Text="{x:Bind StateText}" />
                                     <Run Text="·" />
                                     <Run Text="{x:Bind TimeText}" />
                                 </TextBlock>
-                            </StackPanel>
+                            </Grid>
 
                             <!-- last intent, the reason you opened this thing -->
                             <TextBlock Text="{x:Bind Intent}" FontSize="12" TextTrimming="CharacterEllipsis"
                                        Visibility="{x:Bind Intent, Converter={StaticResource StrVis}}"
                                        Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
 
-                            <!-- provenance · path · branch · context pressure -->
-                            <StackPanel Orientation="Horizontal" Spacing="9" Margin="0,1,0,0">
-                                <TextBlock Text="{x:Bind OriginText}" FontSize="11"
+                            <!-- provenance · branch-or-path · PR · context pressure.
+                                 A Grid, not a StackPanel: the branch takes the slack and
+                                 ellipsises, so a long branch name can never squeeze the
+                                 PR pill or the ctx% off the end of the row. -->
+                            <Grid Margin="0,1,0,0" ColumnSpacing="9">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="{x:Bind OriginText}" FontSize="11"
                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                <TextBlock Text="{x:Bind Location}" FontSize="11"
-                                           MaxWidth="205" TextTrimming="CharacterEllipsis"
+                                <TextBlock Grid.Column="1" Text="{x:Bind Location}" FontSize="11"
+                                           TextTrimming="CharacterEllipsis"
                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                 <!-- open PR for this branch: click to open it in the browser.
                                      A Button (not a Border) so the click is swallowed here
                                      instead of also firing the row's focus-the-terminal. -->
-                                <Button Click="OnPrClick" CornerRadius="9" Padding="6,1"
+                                <Button Grid.Column="2" Click="OnPrClick" CornerRadius="9" Padding="6,1"
                                         MinWidth="0" MinHeight="0" BorderThickness="1"
+                                        VerticalAlignment="Center"
                                         BorderBrush="#4D30A46C" Background="#1A30A46C"
                                         ToolTipService.ToolTip="{x:Bind PrTooltip}"
                                         Visibility="{x:Bind PrText, Converter={StaticResource StrVis}}">
@@ -128,10 +146,10 @@
                                                Foreground="#3FBF7F" />
                                 </Button>
 
-                                <TextBlock Text="{x:Bind ContextPct, Converter={StaticResource Pct}}" FontSize="11"
-                                           FontWeight="SemiBold"
+                                <TextBlock Grid.Column="3" Text="{x:Bind ContextPct, Converter={StaticResource Pct}}"
+                                           FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"
                                            Foreground="{x:Bind ContextPct, Converter={StaticResource PctBrush}}" />
-                            </StackPanel>
+                            </Grid>
                         </StackPanel>
 
                         <!-- affordance for "clicking this row focuses the host window" -->

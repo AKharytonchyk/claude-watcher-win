@@ -119,6 +119,7 @@ public sealed partial class FlyoutWindow : Window
         // click would immediately reopen it, and it could never be closed from the tray.
         if (DateTimeOffset.UtcNow - _dismissedAt < ReopenGuard) return;
 
+        SizeToContent();        // before positioning: the anchor depends on the size
         PositionBottomRight();
         _shownAt = DateTimeOffset.UtcNow;
         _hadFocus = false;
@@ -137,15 +138,46 @@ public sealed partial class FlyoutWindow : Window
         AppWindow.Hide();
     }
 
+    private const int Margin = 12;
+
     /// <summary>Place the flyout at the bottom-right work-area corner (above the tray).</summary>
     private void PositionBottomRight()
     {
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-        const int margin = 12;
         var size = AppWindow.Size;
-        var x = area.X + area.Width - size.Width - margin;
-        var y = area.Y + area.Height - size.Height - margin;
+
+        // Clamped to the work area: on a short screen — or with a taller fleet — the
+        // bottom-right subtraction alone would push the top of the flyout off-screen,
+        // taking the header and the first agents with it.
+        var x = Math.Max(area.X, area.X + area.Width - size.Width - Margin);
+        var y = Math.Max(area.Y, area.Y + area.Height - size.Height - Margin);
         AppWindow.Move(new PointInt32(x, y));
+    }
+
+    /// <summary>
+    /// Fit the window to its content, so one agent doesn't sit in a half-empty panel and
+    /// a long fleet doesn't get clipped. Capped to the work area (the list scrolls beyond
+    /// that) and expressed in physical pixels, since AppWindow works in pixels while
+    /// layout works in DIPs — that mismatch is why a fixed size mis-scaled off 100% DPI.
+    ///
+    /// If measuring yields something implausible (it can before the first layout pass),
+    /// the current size is kept rather than guessing.
+    /// </summary>
+    private void SizeToContent()
+    {
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+        var scale = _view.XamlRoot?.RasterizationScale ?? 1.0;
+
+        _view.Measure(new Windows.Foundation.Size(WidthDip, double.PositiveInfinity));
+        var desired = _view.DesiredSize.Height;
+        if (desired < 120) return;                       // not laid out yet — leave it alone
+
+        var maxDip = (area.Height - 2 * Margin) / scale;
+        var heightDip = Math.Min(desired, maxDip);
+
+        AppWindow.Resize(new SizeInt32(
+            (int)Math.Round(WidthDip * scale),
+            (int)Math.Round(heightDip * scale)));
     }
 }
 

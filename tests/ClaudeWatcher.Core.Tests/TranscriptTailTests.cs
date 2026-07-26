@@ -231,6 +231,23 @@ public sealed class TranscriptTailTests : IDisposable
     }
 
     [Fact]
+    public void A_utf8_bom_does_not_hide_the_first_line()
+    {
+        // Reading raw bytes (unlike File.ReadAllText) keeps the BOM, which makes line 1
+        // fail to parse while later lines still succeed — so tokens would resolve while
+        // the prompt silently vanished.
+        var path = PathFor("bom");
+        var body = string.Join("\n", new[] { Prompt("first line matters"), Assistant("reply", 42) }) + "\n";
+        File.WriteAllText(path, body, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        Assert.Equal(0xEF, File.ReadAllBytes(path)[0]);   // BOM really is there
+
+        var d = new TranscriptReader().Detail(new Session { SessionId = "bom", Cwd = Cwd }, _home);
+
+        Assert.Equal("first line matters", d.LastPrompt);
+        Assert.Equal(42, d.ContextTokens);
+    }
+
+    [Fact]
     public void Cache_is_keyed_by_path_so_a_shared_session_id_across_cwds_does_not_collide()
     {
         var reader = new TranscriptReader();

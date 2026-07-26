@@ -13,6 +13,15 @@ public static class WatchRoots
 {
     public static IReadOnlyList<IWatchRoot> Discover()
     {
+        // Docs/screenshots: point CWATCH_DEMO at a fixture directory and each subfolder
+        // becomes a root named after itself. Real roots are skipped entirely, so a demo
+        // never mixes in (or touches) your actual sessions. See tools/demo-data.ps1.
+        var demo = Environment.GetEnvironmentVariable("CWATCH_DEMO");
+        if (!string.IsNullOrWhiteSpace(demo) && Directory.Exists(demo))
+            return Directory.GetDirectories(demo)
+                            .Select(d => (IWatchRoot)new DemoRoot(Path.GetFileName(d), d))
+                            .ToList();
+
         var roots = new List<IWatchRoot> { new NativeRoot() };
         foreach (var distro in Wsl.Distros())
         {
@@ -43,6 +52,27 @@ public sealed class NativeRoot : IWatchRoot
 
     public bool IsAlive(int pid, DateTimeOffset? startedAt) =>
         ProcessLiveness.IsWindowsPidAlive(pid, startedAt);
+}
+
+/// <summary>
+/// A fixture root for documentation screenshots. The folder name becomes the origin
+/// label (so "VS Code" or "Ubuntu" render exactly as the real thing would), and every
+/// pid counts as alive so the fixture needn't shadow real processes. Only ever created
+/// when CWATCH_DEMO is set.
+/// </summary>
+public sealed class DemoRoot(string name, string dir) : IWatchRoot
+{
+    public string Id => $"demo:{name}";
+    public string Origin => name;
+    public bool IsWsl => false;
+    public string? Distro => null;
+
+    public string HomeDir => dir;
+    public string SessionsDir => Path.Combine(dir, ".claude", "sessions");
+
+    public string ResolvePath(string sessionCwd) => sessionCwd;
+
+    public bool IsAlive(int pid, DateTimeOffset? startedAt) => true;
 }
 
 /// <summary>Claude Code inside a WSL distro. Linux-PID liveness via wsl.exe.</summary>

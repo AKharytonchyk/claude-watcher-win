@@ -169,7 +169,7 @@ public sealed class TranscriptReader
         var buffer = new byte[length - start];
         fs.Position = start;
         var read = fs.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false);
-        var text = Utf8.GetString(buffer, 0, read);
+        var text = Decode(buffer, read);
 
         if (fromStart) return (text, true);
 
@@ -183,7 +183,19 @@ public sealed class TranscriptReader
         var buffer = new byte[fs.Length];
         fs.Position = 0;
         var read = fs.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false);
-        return Utf8.GetString(buffer, 0, read);
+        return Decode(buffer, read);
+    }
+
+    /// <summary>
+    /// Decode UTF-8 and drop a leading byte-order mark. We read raw bytes rather than
+    /// going through File.ReadAllText (which strips the BOM for you), and a BOM left in
+    /// place makes the first line fail to parse as JSON — silently costing whatever
+    /// that line held while later lines still succeed.
+    /// </summary>
+    private static string Decode(byte[] buffer, int length)
+    {
+        var text = Utf8.GetString(buffer, 0, length);
+        return text.Length > 0 && text[0] == '﻿' ? text[1..] : text;
     }
 
     /// <summary>
