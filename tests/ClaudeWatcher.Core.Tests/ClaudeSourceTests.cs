@@ -171,6 +171,50 @@ public class ClaudeSourceTests
         Assert.Null(Assert.Single(root.LivenessQueries).StartedAt);
     }
 
+    [Theory]
+    // host present, native → the host alone; "Windows" adds nothing
+    [InlineData("VS Code", "Windows", false, "VS Code")]
+    [InlineData("Terminal", "Windows", false, "Terminal")]
+    // host present, WSL → host AND distro, because the distro is real information
+    [InlineData("Terminal", "Ubuntu", true, "Terminal · Ubuntu")]
+    // no host (every WSL agent, and any unrecognized native host) → root stands alone
+    [InlineData(null, "Ubuntu", true, "Ubuntu")]
+    [InlineData(null, "Windows", false, "Windows")]
+    [InlineData("", "Windows", false, "Windows")]
+    public void Composes_the_provenance_line(string? host, string origin, bool isWsl, string expected) =>
+        Assert.Equal(expected, FleetBuilder.OriginLine(host, origin, isWsl));
+
+    [Fact]
+    public void Host_lookup_is_surfaced_on_the_view()
+    {
+        using var root = new FakeRoot("native", "Windows", alivePids: new[] { 5 });
+        root.Write(5, "s", "/x", "idle");
+        var sessions = new ClaudeSource(new[] { root }).LiveSessions();
+
+        var (views, _) = FleetBuilder.Build(sessions,
+            detail: _ => new SessionDetail(), branch: _ => null, homePrefix: _ => null,
+            now: DateTimeOffset.Now, host: _ => "VS Code");
+
+        var v = Assert.Single(views);
+        Assert.Equal("VS Code", v.Host);
+        Assert.Equal("VS Code", v.OriginText);
+        Assert.Equal("Windows", v.Origin);   // root label still available
+    }
+
+    [Fact]
+    public void Wsl_sessions_are_flagged_so_callers_skip_windows_only_lookups()
+    {
+        using var native = new FakeRoot("native", "Windows", alivePids: new[] { 1 });
+        using var wsl = new FakeRoot("wsl:Ubuntu", "Ubuntu", alivePids: new[] { 1 }, isWsl: true);
+        native.Write(1, "win", "/c/proj", "idle", startedAt: 1);
+        wsl.Write(1, "lin", "/home/u/proj", "idle", startedAt: 2);
+
+        var agents = new ClaudeSource(new IWatchRoot[] { native, wsl }).LiveSessions();
+
+        Assert.False(agents.Single(a => a.Id == "win").IsWsl);
+        Assert.True(agents.Single(a => a.Id == "lin").IsWsl);
+    }
+
     [Fact]
     public void Missing_directory_yields_nothing_and_is_not_available()
     {

@@ -23,40 +23,12 @@ public static class TerminalFocus
     public static bool Focus(int pid, string rootId)
     {
         if (rootId.StartsWith("wsl:", StringComparison.Ordinal)) return false; // no Windows window
-        foreach (var candidate in Ancestry(pid))
+        foreach (var node in ProcessTree.Ancestry(pid))
         {
-            var hwnd = MainWindowFor(candidate);
+            var hwnd = MainWindowFor(node.Pid);
             if (hwnd != IntPtr.Zero) return Foreground(hwnd);
         }
         return false;
-    }
-
-    /// <summary>The pid and its ancestors (self first), via the process table.</summary>
-    private static List<int> Ancestry(int pid)
-    {
-        var parent = new Dictionary<int, int>();
-        var snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if (snap != IntPtr.Zero && snap != new IntPtr(-1))
-        {
-            try
-            {
-                var e = new PROCESSENTRY32 { dwSize = (uint)Marshal.SizeOf<PROCESSENTRY32>() };
-                if (Process32First(snap, ref e))
-                    do { parent[(int)e.th32ProcessID] = (int)e.th32ParentProcessID; }
-                    while (Process32Next(snap, ref e));
-            }
-            finally { CloseHandle(snap); }
-        }
-
-        var chain = new List<int>();
-        var cur = pid;
-        for (var hops = 0; hops < 64; hops++)
-        {
-            chain.Add(cur);
-            if (!parent.TryGetValue(cur, out var par) || par <= 0 || par == cur) break;
-            cur = par;
-        }
-        return chain;
     }
 
     private static IntPtr MainWindowFor(int pid)
@@ -101,33 +73,7 @@ public static class TerminalFocus
 
     // MARK: - Interop
 
-    private const uint TH32CS_SNAPPROCESS = 0x00000002;
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct PROCESSENTRY32
-    {
-        public uint dwSize;
-        public uint cntUsage;
-        public uint th32ProcessID;
-        public IntPtr th32DefaultHeapID;
-        public uint th32ModuleID;
-        public uint cntThreads;
-        public uint th32ParentProcessID;
-        public int pcPriClassBase;
-        public uint dwFlags;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string szExeFile;
-    }
-
     private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint processId);
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool Process32First(IntPtr snapshot, ref PROCESSENTRY32 entry);
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool Process32Next(IntPtr snapshot, ref PROCESSENTRY32 entry);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr h);
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);

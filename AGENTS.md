@@ -83,6 +83,8 @@ exercised on a real Windows 11 desktop with live native **and** WSL sessions ·
 | `ClaudeWatcher/Platform/WatchRoots.cs`   | Native + per-WSL-distro root discovery (the port's crux) | verified |
 | `ClaudeWatcher/Platform/SessionWatcher.cs` | FileSystemWatcher (native) + polling (WSL 9P) + debounce | verified |
 | `ClaudeWatcher/Platform/ProcessLiveness.cs`| Windows PID liveness; WSL liveness via `wsl.exe kill -0` | verified |
+| `ClaudeWatcher/Platform/ProcessTree.cs`    | One Toolhelp snapshot, walked up from a pid (pid + exe name) | verified |
+| `ClaudeWatcher/Platform/HostDetector.cs`   | Hosting app from the process tree ("Terminal" / "VS Code"), pid-keyed cache | verified |
 | `ClaudeWatcher/Platform/TerminalFocus.cs`  | Focus the hosting window (window-level, not tab) via Win32 | unverified |
 | `ClaudeWatcher/Platform/TrayIconRenderer.cs`| `DotGlyph` bytes → GDI HICON for the shell | verified |
 | `ClaudeWatcher/Platform/PrChecker.cs`      | Optional open-PR lookup via `gh` (gated by `CWATCH_OFFLINE`) | **stub** |

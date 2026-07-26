@@ -28,7 +28,10 @@ public static class WatchRoots
 public sealed class NativeRoot : IWatchRoot
 {
     public string Id => "native";
-    public string Origin => "PowerShell";
+    // "Windows", not "PowerShell": this is *where the agent is rooted*, and a native
+    // agent may well be under cmd, pwsh, or VS Code's own shell. The hosting app is
+    // reported separately by HostDetector.
+    public string Origin => "Windows";
     public bool IsWsl => false;
     public string? Distro => null;
 

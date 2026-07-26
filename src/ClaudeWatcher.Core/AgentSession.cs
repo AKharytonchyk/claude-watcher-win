@@ -32,7 +32,8 @@ public sealed record AgentSession
 
     // Windows roots model:
     public string RootId { get; init; } = "native"; // "native" | "wsl:Ubuntu"
-    public string Origin { get; init; } = "PowerShell"; // display label
+    public string Origin { get; init; } = "Windows"; // display label: "Windows" | "Ubuntu"
+    public bool IsWsl { get; init; }                // true when rooted in a WSL distro
 
     public string ProjectName => Path.GetFileName(Cwd.TrimEnd('/', '\\')) is { Length: > 0 } n ? n : Cwd;
 }

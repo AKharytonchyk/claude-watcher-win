@@ -87,8 +87,14 @@ interface IWatchRoot {
   (`wsl.exe -d <d> -- printf %s "$HOME"`), watch `\\wsl$\<d>\home\<user>\.claude\sessions`.
   Override the distro set with `CWATCH_WSL`.
 
-The origin tag replaces the macOS host-glyph concept (iTerm/VS Code/Terminal) with
-something more useful on Windows: *where the agent is rooted*.
+The origin tag captures *where the agent is rooted*. **Amended after use:** it was
+originally meant to *replace* the macOS host-glyph concept (iTerm/VS Code/Terminal),
+but rooting is nearly constant on one machine while the hosting app is what actually
+helps you find an agent — two native sessions, one in Windows Terminal and one in VS
+Code, were indistinguishable. `HostDetector` now walks the process tree for the host
+app, and the row shows host first, appending the root only when it adds information
+(i.e. naming the WSL distro). A WSL agent's host is undetectable — its pid is a Linux
+pid matching no Windows process — so those rows show the distro alone.
 
 ### Watching
 

@@ -280,7 +280,7 @@ public sealed class TranscriptTailTests : IDisposable
     }
 
     [Fact]
-    public void Concurrent_readers_and_prunes_do_not_corrupt_the_cache()
+    public async Task Concurrent_readers_and_prunes_do_not_corrupt_the_cache()
     {
         // This port enriches on a background thread and refreshes can overlap, so the
         // cache must tolerate concurrent Detail()/Prune() without throwing or hanging.
@@ -306,7 +306,10 @@ public sealed class TranscriptTailTests : IDisposable
             catch (Exception ex) { lock (errors) errors.Add(ex); }
         })).ToArray();
 
-        Assert.True(Task.WaitAll(work, TimeSpan.FromSeconds(60)), "concurrent access hung");
+        var all = Task.WhenAll(work);
+        var finished = await Task.WhenAny(all, Task.Delay(TimeSpan.FromSeconds(60)));
+        Assert.Same(all, finished);   // a hang here means the cache deadlocked
+        await all;                   // surface any exception the tasks threw
         Assert.Empty(errors);
     }
 

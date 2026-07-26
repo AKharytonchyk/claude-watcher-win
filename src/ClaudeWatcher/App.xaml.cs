@@ -69,10 +69,13 @@ public partial class App : Application
             branch: s => _rootById.TryGetValue(s.RootId, out var r)
                 ? GitBranch.Read(r.ResolvePath(s.Cwd)) : null,
             homePrefix: s => _rootById.TryGetValue(s.RootId, out var r) && !r.IsWsl ? r.HomeDir : null,
-            now: DateTimeOffset.Now);
+            now: DateTimeOffset.Now,
+            // A WSL pid is a Linux pid — it matches no Windows process, so don't ask.
+            host: s => s.IsWsl ? null : HostDetector.For(s.Pid));
 
-        // Keep the transcript cache bounded to what's actually running.
+        // Keep the caches bounded to what's actually running.
         _transcripts.Prune(sessions.Select(s => s.Id));
+        HostDetector.Prune(sessions.Where(s => !s.IsWsl).Select(s => s.Pid));
 
         _dispatcher.TryEnqueue(() =>
         {

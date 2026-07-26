@@ -92,6 +92,7 @@ public sealed class ClaudeSource(IReadOnlyList<IWatchRoot> roots) : IAgentSource
             StartedAt = s.StartedDate(),
             RootId = root.Id,
             Origin = root.Origin,
+            IsWsl = root.IsWsl,
         };
     }
 
