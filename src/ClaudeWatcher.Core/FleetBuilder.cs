@@ -12,7 +12,8 @@ public static class FleetBuilder
     private const int IntentMaxLength = 80;
 
     public static AgentView Enrich(AgentSession s, SessionDetail d, string? branch,
-                                   string? homePrefix, DateTimeOffset now, string? host = null)
+                                   string? homePrefix, DateTimeOffset now, string? host = null,
+                                   PrRef? pr = null)
     {
         var model = d.Model ?? s.Model;
         int? tokens = d.ContextTokens ?? s.ContextTokens;
@@ -34,6 +35,7 @@ public static class FleetBuilder
             OriginText = OriginLine(host, s.Origin, s.IsWsl),
             ShortCwd = ShortenCwd(s.Cwd, homePrefix),
             Branch = branch,
+            Pr = pr,
             Intent = string.IsNullOrWhiteSpace(rawIntent) ? null : TextUtil.OneLine(rawIntent!, IntentMaxLength),
             ModelLabel = ContextWindow.HumanModel(model),
             ContextTokens = tokens,
@@ -53,10 +55,11 @@ public static class FleetBuilder
         Func<AgentSession, string?> branch,
         Func<AgentSession, string?> homePrefix,
         DateTimeOffset now,
-        Func<AgentSession, string?>? host = null)
+        Func<AgentSession, string?>? host = null,
+        Func<AgentSession, PrRef?>? pr = null)
     {
         var views = sessions
-            .Select(s => Enrich(s, detail(s), branch(s), homePrefix(s), now, host?.Invoke(s)))
+            .Select(s => Enrich(s, detail(s), branch(s), homePrefix(s), now, host?.Invoke(s), pr?.Invoke(s)))
             .ToList();
         return (views, StatusCounts.Count(views.Select(v => v.State)));
     }

@@ -22,6 +22,7 @@ public partial class App : Application
     private readonly DispatcherQueue _dispatcher = DispatcherQueue.GetForCurrentThread();
     private readonly FleetViewModel _vm = new();
     private readonly TranscriptReader _transcripts = new();
+    private readonly PrChecker _prs = new();
 
     private IReadOnlyList<IWatchRoot> _roots = Array.Empty<IWatchRoot>();
     private Dictionary<string, IWatchRoot> _rootById = new();
@@ -50,6 +51,9 @@ public partial class App : Application
         _watcher.Changed += (_, _) => Refresh();
         _watcher.Start();
 
+        // A PR lookup lands asynchronously; rebuild so the pill appears.
+        _prs.Updated += Refresh;
+
         Refresh();
     }
 
@@ -62,12 +66,20 @@ public partial class App : Application
         if (_source is null) return;
         var sessions = _source.LiveSessions();
 
+        // Resolve each session's repo path once — branch and PR lookups both need it.
+        var repoPath = sessions.ToDictionary(
+            s => s.Id,
+            s => _rootById.TryGetValue(s.RootId, out var r) ? r.ResolvePath(s.Cwd) : null);
+        var branchOf = sessions.ToDictionary(
+            s => s.Id,
+            s => repoPath[s.Id] is { } path ? GitBranch.Read(path) : null);
+
         var (views, counts) = FleetBuilder.Build(
             sessions,
             detail: s => _rootById.TryGetValue(s.RootId, out var r)
                 ? _transcripts.Detail(s.Id, s.Cwd, r.HomeDir) : new SessionDetail(),
-            branch: s => _rootById.TryGetValue(s.RootId, out var r)
-                ? GitBranch.Read(r.ResolvePath(s.Cwd)) : null,
+            branch: s => branchOf[s.Id],
+            pr: s => _prs.Lookup(repoPath[s.Id], branchOf[s.Id]),
             homePrefix: s => _rootById.TryGetValue(s.RootId, out var r) && !r.IsWsl ? r.HomeDir : null,
             now: DateTimeOffset.Now,
             // A WSL pid is a Linux pid — it matches no Windows process, so don't ask.
@@ -76,6 +88,7 @@ public partial class App : Application
         // Keep the caches bounded to what's actually running.
         _transcripts.Prune(sessions.Select(s => s.Id));
         HostDetector.Prune(sessions.Where(s => !s.IsWsl).Select(s => s.Pid));
+        _prs.Prune(sessions.Select(s => PrChecker.KeyFor(repoPath[s.Id], branchOf[s.Id])));
 
         _dispatcher.TryEnqueue(() =>
         {

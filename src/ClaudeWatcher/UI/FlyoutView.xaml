@@ -41,15 +41,18 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="ui:StatePill">
-                        <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                                CornerRadius="11" Padding="8,3">
+                        <!-- Doubles as the filter: click to hide/show that state -->
+                        <Button Click="OnPillClick" Padding="8,3" MinWidth="0" MinHeight="0"
+                                CornerRadius="11" Opacity="{x:Bind Dim}"
+                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                BorderThickness="0" ToolTipService.ToolTip="{x:Bind Tip}">
                             <StackPanel Orientation="Horizontal" Spacing="5">
                                 <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                                          Fill="{x:Bind State, Converter={StaticResource StateBrush}}" />
                                 <TextBlock Text="{x:Bind Count}" FontSize="11.5" FontWeight="SemiBold"
                                            VerticalAlignment="Center" />
                             </StackPanel>
-                        </Border>
+                        </Button>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
@@ -113,6 +116,14 @@
                                 <TextBlock Text="{x:Bind Location}" FontSize="11"
                                            MaxWidth="205" TextTrimming="CharacterEllipsis"
                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                <!-- open PR for this branch, when there is one -->
+                                <Border CornerRadius="9" Padding="6,1" BorderThickness="1"
+                                        BorderBrush="#4D30A46C" Background="#1A30A46C"
+                                        Visibility="{x:Bind PrText, Converter={StaticResource StrVis}}">
+                                    <TextBlock Text="{x:Bind PrText}" FontSize="10.5" FontWeight="SemiBold"
+                                               Foreground="#3FBF7F" />
+                                </Border>
+
                                 <TextBlock Text="{x:Bind ContextPct, Converter={StaticResource Pct}}" FontSize="11"
                                            FontWeight="SemiBold"
                                            Foreground="{x:Bind ContextPct, Converter={StaticResource PctBrush}}" />

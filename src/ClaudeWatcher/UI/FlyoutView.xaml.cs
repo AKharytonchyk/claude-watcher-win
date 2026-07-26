@@ -34,6 +34,13 @@ public sealed partial class FlyoutView : UserControl
         }
     }
 
+    /// <summary>A header pill was clicked: filter that state in or out of the list.</summary>
+    private void OnPillClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: StatePill pill })
+            VM.ToggleState(pill.State);
+    }
+
     private void OnQuit(object sender, RoutedEventArgs e) =>
         (Application.Current as App)?.Quit();
 }

@@ -1,5 +1,8 @@
 namespace ClaudeWatcher.Core;
 
+/// <summary>An open pull request for the agent's branch.</summary>
+public sealed record PrRef(int Number, string Url, bool IsDraft);
+
 /// <summary>
 /// Display-ready projection of one agent — everything the row needs, already
 /// formatted, so the WinUI layer only binds (no logic in XAML). Built by
@@ -36,6 +39,12 @@ public sealed record AgentView
     /// </summary>
     public string Location => Branch is { Length: > 0 } b ? b : ShortCwd;
     public string? Intent { get; init; }              // trimmed last prompt / title
+
+    /// <summary>Open PR for this branch, when one was found (and we're not offline).</summary>
+    public PrRef? Pr { get; init; }
+
+    /// <summary>Pill label, e.g. "#138" — empty when there's no PR, so the pill hides.</summary>
+    public string PrText => Pr is null ? "" : $"#{Pr.Number}";
     public string? ModelLabel { get; init; }          // "Opus 4.8"
     public int? ContextTokens { get; init; }
     public int? ContextWindow { get; init; }

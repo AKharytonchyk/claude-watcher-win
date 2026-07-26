@@ -57,18 +57,36 @@ public static class TerminalFocus
         return found;
     }
 
+    /// <summary>
+    /// Raise a window, and report whether it actually came forward.
+    ///
+    /// <c>SetForegroundWindow</c> returns nonzero even when Windows quietly declines
+    /// the request, so success is confirmed against <c>GetForegroundWindow</c> instead
+    /// of the return value — trusting the bool reported success while the previous app
+    /// stayed on top.
+    ///
+    /// The plain call is tried first: it is permitted whenever we already own the
+    /// foreground, which is exactly the case here because the user just clicked our
+    /// flyout. The <c>AttachThreadInput</c> dance is a fallback for when the lock
+    /// refuses us — doing it unconditionally *prevented* the switch.
+    /// </summary>
     private static bool Foreground(IntPtr hwnd)
     {
         const int SW_RESTORE = 9;
         if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
 
-        var fg = GetForegroundWindow();
+        SetForegroundWindow(hwnd);
+        if (GetForegroundWindow() == hwnd) return true;
+
         var target = GetWindowThreadProcessId(hwnd, out _);
-        var current = GetWindowThreadProcessId(fg, out _);
-        if (target != current) AttachThreadInput(current, target, true);
-        var ok = SetForegroundWindow(hwnd);
-        if (target != current) AttachThreadInput(current, target, false);
-        return ok;
+        var current = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+        if (target == 0 || current == 0 || target == current) return false;
+
+        AttachThreadInput(current, target, true);
+        BringWindowToTop(hwnd);
+        SetForegroundWindow(hwnd);
+        AttachThreadInput(current, target, false);
+        return GetForegroundWindow() == hwnd;
     }
 
     // MARK: - Interop
@@ -91,4 +109,6 @@ public static class TerminalFocus
     private static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")]
     private static extern bool AttachThreadInput(uint attach, uint attachTo, bool fAttach);
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hwnd);
 }
