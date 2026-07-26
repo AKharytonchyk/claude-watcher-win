@@ -28,7 +28,14 @@ internal sealed class FakeRoot : IWatchRoot, IDisposable
     public string HomeDir => Path.GetTempPath();
     public string ResolvePath(string sessionCwd) => sessionCwd;
 
-    public bool IsAlive(int pid) => _alivePids.Contains(pid);
+    /// <summary>Records what liveness was asked about, so tests can assert on it.</summary>
+    public List<(int Pid, DateTimeOffset? StartedAt)> LivenessQueries { get; } = new();
+
+    public bool IsAlive(int pid, DateTimeOffset? startedAt)
+    {
+        LivenessQueries.Add((pid, startedAt));
+        return _alivePids.Contains(pid);
+    }
 
     public void Write(int pid, string sessionId, string cwd, string status,
                       string? waitingFor = null, double? startedAt = null)
@@ -121,6 +128,47 @@ public class ClaudeSourceTests
         Assert.Equal("PowerShell", agents.Single(a => a.Id == "win").Origin);
         Assert.Equal("Ubuntu", agents.Single(a => a.Id == "lin").Origin);
         Assert.Equal("wsl:Ubuntu", agents.Single(a => a.Id == "lin").RootId);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Drops_non_positive_pids_without_probing_liveness(int pid)
+    {
+        // `kill -0 0` hits the caller's process group and `kill -0 -1` every permitted
+        // process, so such a pid must never reach the liveness probe at all.
+        using var root = new FakeRoot("native", "PowerShell", alivePids: new[] { pid });
+        root.Write(pid, "phantom", "/x", "busy");
+
+        var agents = new ClaudeSource(new[] { root }).LiveSessions();
+
+        Assert.Empty(agents);
+        Assert.Empty(root.LivenessQueries);
+    }
+
+    [Fact]
+    public void Passes_the_declared_start_time_to_the_liveness_check()
+    {
+        // The root needs it to reject a recycled pid.
+        using var root = new FakeRoot("native", "PowerShell", alivePids: new[] { 42 });
+        root.Write(42, "s", "/x", "idle", startedAt: 1_700_000_000_000);
+
+        new ClaudeSource(new[] { root }).LiveSessions();
+
+        var q = Assert.Single(root.LivenessQueries);
+        Assert.Equal(42, q.Pid);
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_000), q.StartedAt);
+    }
+
+    [Fact]
+    public void Missing_start_time_is_passed_as_null_so_roots_can_fail_open()
+    {
+        using var root = new FakeRoot("native", "PowerShell", alivePids: new[] { 7 });
+        root.Write(7, "s", "/x", "idle");   // no startedAt
+
+        new ClaudeSource(new[] { root }).LiveSessions();
+
+        Assert.Null(Assert.Single(root.LivenessQueries).StartedAt);
     }
 
     [Fact]

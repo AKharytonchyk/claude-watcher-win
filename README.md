@@ -21,18 +21,19 @@ at a glance, from anywhere on your desktop. The Windows sibling of
 
 ## Stack
 
-WinUI 3 (Windows App SDK) + C# / .NET 8 — Fluent design, mica/acrylic, automatic
+WinUI 3 (Windows App SDK) + C# / .NET 10 — Fluent design, mica/acrylic, automatic
 light/dark. Tray icon via [`H.NotifyIcon`](https://github.com/HavenDV/H.NotifyIcon).
 Unpackaged (no MSIX required) to keep distribution lean.
 
 ## Build (on Windows)
 
 ```powershell
-dotnet build src/ClaudeWatcher/ClaudeWatcher.csproj -c Debug
-dotnet run   --project src/ClaudeWatcher/ClaudeWatcher.csproj
+dotnet build ClaudeWatcher.sln -c Debug
+src/ClaudeWatcher/bin/x64/Debug/net10.0-windows10.0.19041.0/win-x64/ClaudeWatcher.exe
 ```
 
-Requires the .NET 8 SDK and the Windows App SDK workload. See
+Requires the .NET 10 SDK; the Windows App SDK comes in via NuGet and is carried
+in the app, so there is no workload or runtime to install. See
 [AGENTS.md](AGENTS.md) for the full build/run/verify loop and prerequisites.
 
 ## Data source

@@ -38,7 +38,8 @@ public sealed class NativeRoot : IWatchRoot
     // Native cwd is already a Windows path.
     public string ResolvePath(string sessionCwd) => sessionCwd;
 
-    public bool IsAlive(int pid) => ProcessLiveness.IsWindowsPidAlive(pid);
+    public bool IsAlive(int pid, DateTimeOffset? startedAt) =>
+        ProcessLiveness.IsWindowsPidAlive(pid, startedAt);
 }
 
 /// <summary>Claude Code inside a WSL distro. Linux-PID liveness via wsl.exe.</summary>
@@ -55,5 +56,7 @@ public sealed class WslRoot(string distro, string posixHome) : IWatchRoot
     // The session's cwd is a POSIX path inside the distro.
     public string ResolvePath(string sessionCwd) => Wsl.ToWindowsPath(distro, sessionCwd);
 
-    public bool IsAlive(int pid) => ProcessLiveness.IsWslPidAlive(distro, pid);
+    // startedAt is unused: a WSL pid's start time isn't comparable to a Windows clock.
+    public bool IsAlive(int pid, DateTimeOffset? startedAt) =>
+        ProcessLiveness.IsWslPidAlive(distro, pid);
 }
