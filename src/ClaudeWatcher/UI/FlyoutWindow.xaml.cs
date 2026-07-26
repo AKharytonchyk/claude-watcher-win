@@ -1,4 +1,4 @@
-using ClaudeWatcher.Core;
+﻿using ClaudeWatcher.Core;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -18,8 +18,8 @@ namespace ClaudeWatcher.UI;
 /// </summary>
 public sealed partial class FlyoutWindow : Window
 {
-    private const int WidthDip = 360;
-    private const int HeightDip = 560;
+    private const int WidthDip = 388;
+    private const int HeightDip = 580;
 
     /// <summary>
     /// A tray click that lands within this of a dismissal is treated as "the user
@@ -148,3 +148,4 @@ public sealed partial class FlyoutWindow : Window
         AppWindow.Move(new PointInt32(x, y));
     }
 }
+

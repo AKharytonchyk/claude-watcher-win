@@ -51,3 +51,32 @@ public sealed class ContextPctConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, string language) =>
         throw new NotSupportedException();
 }
+
+/// <summary>
+/// Context pressure → colour. A number is easy to skim past; the point of showing
+/// ctx% at all is that a nearly-full window is about to bite, so it earns red.
+/// </summary>
+public sealed class ContextPctToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        var p = value is double d ? d : 0;
+        if (p >= 0.90) return new SolidColorBrush(Color.FromArgb(255, 0xE5, 0x48, 0x4D));  // out of room
+        if (p >= 0.75) return new SolidColorBrush(Color.FromArgb(255, 0xF5, 0xA6, 0x23));  // getting tight
+        return Application.Current.Resources["TextFillColorTertiaryBrush"] as Brush
+               ?? new SolidColorBrush(Color.FromArgb(255, 0x9A, 0x9A, 0x9A));
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>Non-empty string → Visible. Keeps blank meta fields from eating row space.</summary>
+public sealed class StringToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language) =>
+        string.IsNullOrWhiteSpace(value as string) ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language) =>
+        throw new NotSupportedException();
+}

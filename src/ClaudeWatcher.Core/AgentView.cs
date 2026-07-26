@@ -28,6 +28,13 @@ public sealed record AgentView
     public required string OriginText { get; init; }
 
     public string? Branch { get; init; }
+
+    /// <summary>
+    /// Where the agent sits, in one field: the git branch when it's in a repo, else
+    /// the collapsed path. Showing both crowds the row and truncates each to
+    /// uselessness, and the agent's name already carries the project.
+    /// </summary>
+    public string Location => Branch is { Length: > 0 } b ? b : ShortCwd;
     public string? Intent { get; init; }              // trimmed last prompt / title
     public string? ModelLabel { get; init; }          // "Opus 4.8"
     public int? ContextTokens { get; init; }

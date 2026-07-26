@@ -15,6 +15,12 @@ public sealed class FleetViewModel : INotifyPropertyChanged
 {
     public ObservableCollection<AgentView> Agents { get; } = new();
 
+    /// <summary>
+    /// Per-state count badges for the header, in urgency order and only for states
+    /// that actually have agents — the macOS popover's "● 1  ● 2" at a glance.
+    /// </summary>
+    public ObservableCollection<StatePill> Pills { get; } = new();
+
     private string _summary = "No running agents";
     public string Summary
     {
@@ -34,6 +40,10 @@ public sealed class FleetViewModel : INotifyPropertyChanged
     {
         Agents.Clear();
         foreach (var v in views) Agents.Add(v);
+
+        Pills.Clear();
+        foreach (var (state, count) in counts.Present) Pills.Add(new StatePill(state, count));
+
         Summary = SummaryText.For(counts);
         IsEmpty = views.Count == 0;
     }
@@ -41,3 +51,6 @@ public sealed class FleetViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
+
+/// <summary>One header count badge: a state and how many agents are in it.</summary>
+public sealed record StatePill(AgentState State, int Count);
