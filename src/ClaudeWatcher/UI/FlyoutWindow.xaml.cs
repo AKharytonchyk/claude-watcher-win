@@ -130,6 +130,16 @@ public sealed partial class FlyoutWindow : Window
         // dismissal watch only acts on focus it actually saw us hold.
         SetForegroundWindow(WindowNative.GetWindowHandle(this));
         _dismissWatch.Start();
+
+        // Re-fit once the content has actually been laid out. A ListView virtualizes, so
+        // measuring before the window is on screen reports the chrome and almost nothing
+        // else — which sized the flyout to 160px and clipped four of five agents.
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            if (!AppWindow.IsVisible) return;
+            SizeToContent();
+            PositionBottomRight();
+        });
     }
 
     private void Hide()
@@ -168,6 +178,7 @@ public sealed partial class FlyoutWindow : Window
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         var scale = _view.XamlRoot?.RasterizationScale ?? 1.0;
 
+        _view.UpdateLayout();   // realize the rows, or we measure an all-but-empty list
         _view.Measure(new Windows.Foundation.Size(WidthDip, double.PositiveInfinity));
         var desired = _view.DesiredSize.Height;
         if (desired < 120) return;                       // not laid out yet — leave it alone
