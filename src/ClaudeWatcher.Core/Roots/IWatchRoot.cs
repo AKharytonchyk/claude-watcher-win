@@ -48,6 +48,12 @@ public interface IWatchRoot
     /// Whether the owning process is still running. Native roots use Win32; WSL
     /// roots must NOT feed the Linux pid to Win32 — they use
     /// <c>wsl.exe -d &lt;distro&gt; -- kill -0 &lt;pid&gt;</c> or mtime staleness.
+    ///
+    /// <paramref name="startedAt"/> is the session's declared start time, used to
+    /// reject a <b>recycled</b> pid: a session file left behind by a crashed agent
+    /// names a pid the kernel may since have reused, and liveness alone cannot tell
+    /// the difference. Implementations must <b>fail open</b> (report alive) when the
+    /// start time is unknown or unobtainable.
     /// </summary>
-    bool IsAlive(int pid);
+    bool IsAlive(int pid, DateTimeOffset? startedAt);
 }

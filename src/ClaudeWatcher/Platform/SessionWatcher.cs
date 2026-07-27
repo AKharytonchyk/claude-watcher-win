@@ -17,6 +17,7 @@ public sealed class SessionWatcher(IReadOnlyList<IWatchRoot> roots) : IDisposabl
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(1500);
 
     private readonly List<FileSystemWatcher> _fsWatchers = new();
+    private readonly HashSet<string> _watchedDirs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _signatures = new(); // rootId → last dir signature
     private Timer? _pollTimer;
     private Timer? _debounceTimer;
@@ -29,13 +30,56 @@ public sealed class SessionWatcher(IReadOnlyList<IWatchRoot> roots) : IDisposabl
 
     public void Start()
     {
+        SyncWatchers();
+
+        // Poll all roots (cheap signature) — catches WSL + late-created native dirs.
+        _pollTimer = new Timer(_ => PollOnce(), null, TimeSpan.Zero, PollInterval);
+    }
+
+    /// <summary>
+    /// Arm a <see cref="FileSystemWatcher"/> for every native root whose directory
+    /// exists, and drop watchers whose directory went away.
+    ///
+    /// A watcher created on a path that does not exist yet never fires, not even once
+    /// the directory appears — so an absent dir must be left unwatched and re-armed
+    /// later. Polling still covers it in the meantime; this only upgrades it back to
+    /// instant events. Called from <see cref="Start"/> and each poll, and only does
+    /// work when the set of existing directories actually changes.
+    /// </summary>
+    private void SyncWatchers()
+    {
+        var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var root in roots)
         {
             if (root.IsWsl) continue;                 // WSL is polled, not watched
             try
             {
-                if (!Directory.Exists(root.SessionsDir)) continue;
-                var w = new FileSystemWatcher(root.SessionsDir, "*.json")
+                if (Directory.Exists(root.SessionsDir)) wanted.Add(root.SessionsDir);
+            }
+            catch (Exception) { /* unreachable path — leave it to polling */ }
+        }
+
+        List<FileSystemWatcher> retired;
+        lock (_gate)
+        {
+            if (wanted.SetEquals(_watchedDirs)) return;   // nothing to do — the common case
+
+            retired = new List<FileSystemWatcher>(_fsWatchers);
+            _fsWatchers.Clear();
+            _watchedDirs.Clear();
+        }
+
+        // Dispose and construct OUTSIDE the lock. Disposing a watcher can run pending
+        // event callbacks, and those call ScheduleChanged, which takes _gate — holding
+        // it here would deadlock.
+        foreach (var w in retired) { try { w.Dispose(); } catch { } }
+
+        var created = new List<(string Dir, FileSystemWatcher Watcher)>();
+        foreach (var dir in wanted)
+        {
+            try
+            {
+                var w = new FileSystemWatcher(dir, "*.json")
                 {
                     NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
                     IncludeSubdirectories = false,
@@ -45,19 +89,27 @@ public sealed class SessionWatcher(IReadOnlyList<IWatchRoot> roots) : IDisposabl
                 w.Changed += OnFsEvent;
                 w.Deleted += OnFsEvent;
                 w.Renamed += OnFsEvent;
-                _fsWatchers.Add(w);
+                created.Add((dir, w));
             }
             catch (Exception) { /* fall back to polling for this root */ }
         }
 
-        // Poll all roots (cheap signature) — catches WSL + late-created native dirs.
-        _pollTimer = new Timer(_ => PollOnce(), null, TimeSpan.Zero, PollInterval);
+        lock (_gate)
+        {
+            foreach (var (dir, w) in created)
+            {
+                _fsWatchers.Add(w);
+                _watchedDirs.Add(dir);
+            }
+        }
     }
 
     private void OnFsEvent(object sender, FileSystemEventArgs e) => ScheduleChanged();
 
     private void PollOnce()
     {
+        SyncWatchers();   // a sessions dir may have just appeared (or vanished)
+
         var changed = false;
         foreach (var root in roots)
         {
@@ -103,9 +155,17 @@ public sealed class SessionWatcher(IReadOnlyList<IWatchRoot> roots) : IDisposabl
 
     public void Dispose()
     {
-        foreach (var w in _fsWatchers) { try { w.Dispose(); } catch { } }
-        _fsWatchers.Clear();
-        _pollTimer?.Dispose();
+        _pollTimer?.Dispose();       // stop re-arming before tearing the watchers down
+
+        List<FileSystemWatcher> retired;
+        lock (_gate)
+        {
+            retired = new List<FileSystemWatcher>(_fsWatchers);
+            _fsWatchers.Clear();
+            _watchedDirs.Clear();
+        }
+        foreach (var w in retired) { try { w.Dispose(); } catch { } }   // outside the lock
+
         _debounceTimer?.Dispose();
     }
 }

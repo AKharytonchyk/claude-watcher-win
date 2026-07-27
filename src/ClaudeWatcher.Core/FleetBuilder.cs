@@ -12,7 +12,8 @@ public static class FleetBuilder
     private const int IntentMaxLength = 80;
 
     public static AgentView Enrich(AgentSession s, SessionDetail d, string? branch,
-                                   string? homePrefix, DateTimeOffset now)
+                                   string? homePrefix, DateTimeOffset now, string? host = null,
+                                   PrRef? pr = null)
     {
         var model = d.Model ?? s.Model;
         int? tokens = d.ContextTokens ?? s.ContextTokens;
@@ -30,8 +31,11 @@ public static class FleetBuilder
             Pid = s.Pid,
             RootId = s.RootId,
             Origin = s.Origin,
+            Host = host,
+            OriginText = OriginLine(host, s.Origin, s.IsWsl),
             ShortCwd = ShortenCwd(s.Cwd, homePrefix),
             Branch = branch,
+            Pr = pr,
             Intent = string.IsNullOrWhiteSpace(rawIntent) ? null : TextUtil.OneLine(rawIntent!, IntentMaxLength),
             ModelLabel = ContextWindow.HumanModel(model),
             ContextTokens = tokens,
@@ -50,10 +54,28 @@ public static class FleetBuilder
         Func<AgentSession, SessionDetail> detail,
         Func<AgentSession, string?> branch,
         Func<AgentSession, string?> homePrefix,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Func<AgentSession, string?>? host = null,
+        Func<AgentSession, PrRef?>? pr = null)
     {
-        var views = sessions.Select(s => Enrich(s, detail(s), branch(s), homePrefix(s), now)).ToList();
+        var views = sessions
+            .Select(s => Enrich(s, detail(s), branch(s), homePrefix(s), now, host?.Invoke(s), pr?.Invoke(s)))
+            .ToList();
         return (views, StatusCounts.Count(views.Select(v => v.State)));
+    }
+
+    /// <summary>
+    /// Compose the provenance line. The host app is what actually helps you find an
+    /// agent ("VS Code" vs "Terminal"), so it leads; the root is appended only when it
+    /// says something the host doesn't — i.e. for WSL, naming the distro. A native
+    /// agent whose host we identified needs no "Windows" suffix, and when the host is
+    /// undetectable (every WSL agent — a Linux pid maps to no Windows process) the
+    /// root stands alone.
+    /// </summary>
+    public static string OriginLine(string? host, string origin, bool isWsl)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return origin;
+        return isWsl ? $"{host} · {origin}" : host;
     }
 
     /// <summary>Collapse a leading home prefix to "~". No-op when prefix is null.</summary>

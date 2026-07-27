@@ -64,7 +64,12 @@ public sealed class ClaudeSource(IReadOnlyList<IWatchRoot> roots) : IAgentSource
             catch (IOException) { }              // mid-write / vanished — skip
             catch (JsonException) { }            // malformed — skip
 
-            if (session is { SessionId.Length: > 0 } s && root.IsAlive(s.Pid))
+            // A pid of 0 or below is never a real process, and passing one to a
+            // signal-based liveness check is actively dangerous: `kill -0 0` targets
+            // the caller's process group and `kill -0 -1` every permitted process, so
+            // a malformed session file would report a phantom agent alive forever.
+            if (session is { SessionId.Length: > 0, Pid: > 0 } s &&
+                root.IsAlive(s.Pid, s.StartedDate()))
                 yield return s;
         }
     }
@@ -87,6 +92,7 @@ public sealed class ClaudeSource(IReadOnlyList<IWatchRoot> roots) : IAgentSource
             StartedAt = s.StartedDate(),
             RootId = root.Id,
             Origin = root.Origin,
+            IsWsl = root.IsWsl,
         };
     }
 

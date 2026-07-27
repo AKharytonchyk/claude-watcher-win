@@ -9,7 +9,7 @@ Quick reminders:
 - **Spec-driven** via GitHub Spec Kit: use `/speckit-specify` → `/speckit-plan` →
   `/speckit-tasks` → `/speckit-implement` for real features; the canonical
   constitution is `.specify/memory/constitution.md` (`/speckit-constitution`).
-- WinUI 3 / C# / .NET 8. Build & verify on **Windows** (`dotnet build`, then open
+- WinUI 3 / C# / .NET 10. Build & verify on **Windows** (`dotnet build`, then open
   the tray flyout). The `Core/` library is the only piece that builds/tests
   cross-platform.
 - Keep `Core/` free of WinUI/Win32 so it stays unit-testable.

@@ -22,6 +22,7 @@ public partial class App : Application
     private readonly DispatcherQueue _dispatcher = DispatcherQueue.GetForCurrentThread();
     private readonly FleetViewModel _vm = new();
     private readonly TranscriptReader _transcripts = new();
+    private readonly PrChecker _prs = new();
 
     private IReadOnlyList<IWatchRoot> _roots = Array.Empty<IWatchRoot>();
     private Dictionary<string, IWatchRoot> _rootById = new();
@@ -29,6 +30,7 @@ public partial class App : Application
     private SessionWatcher? _watcher;
     private TaskbarIcon? _tray;
     private FlyoutWindow? _flyout;
+    private IntPtr _trayIcon;   // current tray HICON; we own it (see SetTrayIcon)
 
     public App() => InitializeComponent();
 
@@ -40,11 +42,17 @@ public partial class App : Application
 
         _tray = new TaskbarIcon { ToolTipText = "Claude Watcher" };
         _tray.ForceCreate();
+        // Without this, the click is held back by the double-click disambiguation
+        // timer — which fires on a timer thread, where WinUI windows can't be touched.
+        _tray.NoLeftClickDelay = true;
         _tray.LeftClickCommand = new RelayCommand(ToggleFlyout);
 
         _watcher = new SessionWatcher(_roots);
         _watcher.Changed += (_, _) => Refresh();
         _watcher.Start();
+
+        // A PR lookup lands asynchronously; rebuild so the pill appears.
+        _prs.Updated += Refresh;
 
         Refresh();
     }
@@ -58,28 +66,68 @@ public partial class App : Application
         if (_source is null) return;
         var sessions = _source.LiveSessions();
 
+        // Resolve each session's repo path once — branch and PR lookups both need it.
+        var repoPath = sessions.ToDictionary(
+            s => s.Id,
+            s => _rootById.TryGetValue(s.RootId, out var r) ? r.ResolvePath(s.Cwd) : null);
+        var branchOf = sessions.ToDictionary(
+            s => s.Id,
+            s => repoPath[s.Id] is { } path ? GitBranch.Read(path) : null);
+
         var (views, counts) = FleetBuilder.Build(
             sessions,
             detail: s => _rootById.TryGetValue(s.RootId, out var r)
                 ? _transcripts.Detail(s.Id, s.Cwd, r.HomeDir) : new SessionDetail(),
-            branch: s => _rootById.TryGetValue(s.RootId, out var r)
-                ? GitBranch.Read(r.ResolvePath(s.Cwd)) : null,
+            branch: s => branchOf[s.Id],
+            pr: s => _prs.Lookup(repoPath[s.Id], branchOf[s.Id]),
             homePrefix: s => _rootById.TryGetValue(s.RootId, out var r) && !r.IsWsl ? r.HomeDir : null,
-            now: DateTimeOffset.Now);
+            now: DateTimeOffset.Now,
+            // A WSL pid is a Linux pid — it matches no Windows process, so don't ask.
+            host: s => s.IsWsl ? null : HostDetector.For(s.Pid));
+
+        // Keep the caches bounded to what's actually running.
+        _transcripts.Prune(sessions.Select(s => s.Id));
+        HostDetector.Prune(sessions.Where(s => !s.IsWsl).Select(s => s.Pid));
+        _prs.Prune(sessions.Select(s => PrChecker.KeyFor(repoPath[s.Id], branchOf[s.Id])));
 
         _dispatcher.TryEnqueue(() =>
         {
             _vm.Update(views, counts);
             if (_tray is not null)
             {
-                _tray.IconSource = TrayIconRenderer.DotBitmap(counts.Dominant);
+                SetTrayIcon(counts.Dominant);
                 _tray.ToolTipText = $"Claude Watcher — {SummaryText.For(counts)}";
             }
         });
     }
 
+    /// <summary>
+    /// Swap in a freshly drawn dot. We hand the shell a raw HICON (see
+    /// <see cref="TrayIconRenderer"/>) and only release the previous handle once the
+    /// replacement is in place, so the tray never points at a destroyed icon.
+    /// </summary>
+    private void SetTrayIcon(AgentState? dominant)
+    {
+        if (_tray is null) return;
+
+        var icon = TrayIconRenderer.CreateDotIcon(dominant);
+        if (icon == IntPtr.Zero) return;
+
+        _tray.TrayIcon.UpdateIcon(icon);
+        if (_trayIcon != IntPtr.Zero) TrayIconRenderer.DestroyIcon(_trayIcon);
+        _trayIcon = icon;
+    }
+
     private void ToggleFlyout()
     {
+        // Defense in depth: the tray click can arrive off the UI thread, and creating
+        // or showing a Window there throws where nobody is listening.
+        if (!_dispatcher.HasThreadAccess)
+        {
+            _dispatcher.TryEnqueue(ToggleFlyout);
+            return;
+        }
+
         _flyout ??= new FlyoutWindow(_vm, OnOpenAgent);
         _flyout.ToggleNearTray();
     }
@@ -90,6 +138,7 @@ public partial class App : Application
     {
         _watcher?.Dispose();
         _tray?.Dispose();
+        if (_trayIcon != IntPtr.Zero) TrayIconRenderer.DestroyIcon(_trayIcon);
         Exit();
     }
 }

@@ -29,8 +29,6 @@ public static class SessionExtensions
 
     public static string DisplayName(this Session s) => s.Name ?? s.ProjectName();
 
-    public static bool IsBusy(this Session s) => s.Status == "busy";
-
     /// <summary>When the status last changed, if known.</summary>
     public static DateTimeOffset? StatusDate(this Session s)
     {

@@ -6,16 +6,24 @@
 > This doc stays as the architectural north star for the MVP.
 
 
-- **Status:** in progress — **Core complete + tested** (39 unit tests). Phases
-  1–3 implemented and now **build green on CI** (`windows-latest`): WSL discovery,
-  native watcher + WSL polling, tray render, acrylic flyout, Win32 window focus.
-  **Runtime unverified** — pending a real Windows desktop (launch the tray, open
-  the flyout, confirm native + WSL sessions appear and update). `PrChecker`
-  remains a stub.
+- **Status:** Phases 1–3 **verified on a real Windows 11 desktop** (26200) with a
+  live native session *and* a live WSL/Ubuntu session: both roots discovered, tray
+  dot in the dominant color, tooltip and flyout header reading
+  `1 working · 1 idle`, rows tagged `PowerShell` / `Ubuntu` with branch `main`, and
+  transcript enrichment parsing a real 2.1.220 transcript (Opus 5, 108k/200k = 54%,
+  4 ms). Core is 54/54 green after porting the macOS
+  [PR #5](https://github.com/AKharytonchyk/claude-watcher/pull/5) perf/robustness
+  work (transcript tail read, pid-reuse guard, cache eviction, watcher re-arm).
+  Still open: `TerminalFocus` (row-click focus) is the one untested path,
+  `PrChecker` is a stub, and the flyout has no filter chips and a fixed pixel size
+  (mis-scales off 100% DPI).
 - **Owner:** —
 - **Gate:** Phase 2 (WSL) must prove that (a) a distro's `~/.claude/sessions` is
   readable from Windows via `\\wsl$` and (b) WSL-session liveness is derivable
   before the polling watcher and origin tagging are built out.
+  → **Both proven.** (a) `\\wsl$\Ubuntu\home\pi\.claude\sessions` enumerates fine;
+  (b) `wsl.exe -d Ubuntu -- kill -0 <pid>` returns 0 for a live Linux PID and 1 for
+  a dead one, in ~60 ms per call.
 
 ## Problem
 
@@ -79,8 +87,14 @@ interface IWatchRoot {
   (`wsl.exe -d <d> -- printf %s "$HOME"`), watch `\\wsl$\<d>\home\<user>\.claude\sessions`.
   Override the distro set with `CWATCH_WSL`.
 
-The origin tag replaces the macOS host-glyph concept (iTerm/VS Code/Terminal) with
-something more useful on Windows: *where the agent is rooted*.
+The origin tag captures *where the agent is rooted*. **Amended after use:** it was
+originally meant to *replace* the macOS host-glyph concept (iTerm/VS Code/Terminal),
+but rooting is nearly constant on one machine while the hosting app is what actually
+helps you find an agent — two native sessions, one in Windows Terminal and one in VS
+Code, were indistinguishable. `HostDetector` now walks the process tree for the host
+app, and the row shows host first, appending the root only when it adds information
+(i.e. naming the WSL distro). A WSL agent's host is undetectable — its pid is a Linux
+pid matching no Windows process — so those rows show the distro alone.
 
 ### Watching
 

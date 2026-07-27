@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>ClaudeWatcher</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -12,19 +12,31 @@
     <!-- Unpackaged: no MSIX required. Keeps distribution lean (Constitution §3). -->
     <WindowsPackageType>None</WindowsPackageType>
     <EnableMsixTooling>true</EnableMsixTooling>
+    <!-- Carry the Windows App SDK with us. An unpackaged app otherwise needs a
+         matching Windows App Runtime *and* its DDLM registered; a machine with only
+         the framework package (common — they arrive as dependencies of other apps)
+         dies at startup with 0x80670016, "Package dependency criteria could not be
+         resolved", before any of our code runs. This is the "runtime provisioning"
+         risk in specs/0001 — self-contained retires it. -->
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</RuntimeIdentifier>
+    <!-- Release carries the .NET runtime too, so a target machine needs nothing
+         installed at all (~220 MB, 500+ files — WinUI can't be trimmed). Debug stays
+         framework-dependent to keep the edit/run loop quick. -->
+    <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
-  <!-- H.NotifyIcon.WinUI is pinned: 2.4.0+ dropped net8 (requires net10). 2.3.0
-       is the newest stable that supports net8.0-windows10.0.17763 (compatible
-       with our 19041 target). Bump alongside a net10 retarget if we ever move. -->
+  <!-- On net10 both former pins are gone: H.NotifyIcon 2.4+ requires net10 (it had
+       held us at 2.3.0), and Windows App SDK 2.3.x is the line whose runtime ships
+       with a DDLM registered on current Windows boxes. -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.*" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.3.*" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.*" />
-    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.3.0" />
+    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.*" />
   </ItemGroup>
 
   <ItemGroup>

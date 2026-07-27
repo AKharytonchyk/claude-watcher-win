@@ -41,9 +41,34 @@ public static class Wsl
     /// <summary>UNC prefix for a distro's filesystem, e.g. <c>\\wsl$\Ubuntu</c>.</summary>
     public static string UncRoot(string distro) => $@"\\wsl$\{distro}";
 
-    /// <summary>Rebase a POSIX path under the distro's UNC root.</summary>
+    /// <summary>
+    /// Rebase a POSIX path onto something Windows can open. Paths on a mounted
+    /// Windows drive map back to that drive; everything else goes under the UNC root.
+    /// </summary>
     public static string ToWindowsPath(string distro, string posixPath) =>
-        UncRoot(distro) + posixPath.Replace('/', '\\');
+        DrivePath(posixPath) ?? UncRoot(distro) + posixPath.Replace('/', '\\');
+
+    /// <summary>
+    /// <c>/mnt/c/foo</c> → <c>C:\foo</c>, or null if this isn't a drive mount.
+    /// Agents run from WSL very often sit on a Windows drive, and reaching those
+    /// through <c>\\wsl$\Distro\mnt\c\…</c> is a needless round trip through 9P —
+    /// slow, and it silently fails often enough that git/branch lookups come back
+    /// empty. Assumes the default <c>/mnt</c> automount root (configurable in
+    /// wsl.conf; a custom root just falls through to the UNC path).
+    /// </summary>
+    private static string? DrivePath(string posixPath)
+    {
+        const string prefix = "/mnt/";
+        if (!posixPath.StartsWith(prefix, StringComparison.Ordinal)) return null;
+
+        var rest = posixPath[prefix.Length..];
+        if (rest.Length == 0 || !char.IsAsciiLetter(rest[0])) return null;
+        // Guard against /mnt/wsl, /mnt/host and friends — a drive is one letter.
+        if (rest.Length > 1 && rest[1] != '/') return null;
+
+        var tail = rest.Length > 1 ? rest[1..].Replace('/', '\\') : "\\";
+        return $"{char.ToUpperInvariant(rest[0])}:{tail}";
+    }
 
     private static string? Run(string exe, string[] args, Encoding stdoutEncoding)
     {
