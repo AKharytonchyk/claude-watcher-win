@@ -151,12 +151,15 @@ if ($Stress) {
 }
 
 # --- the demo fleet -------------------------------------------------------------
+# Invented projects only: this fixture ends up in public documentation, so it must not
+# name anybody's real work.
+#
 # Red: blocked on you, and nearly out of context.
-New-DemoAgent -Origin 'Terminal' -Name 'comic-project-b5' `
-    -Cwd (New-DemoRepo (Join-Path $repos 'comic-project') 'feat/epub-ru') `
+New-DemoAgent -Origin 'Terminal' -Name 'invoice-parser-b5' `
+    -Cwd (New-DemoRepo (Join-Path $repos 'invoice-parser') 'feat/pdf-tables') `
     -Status 'waiting' -WaitingFor 'permission prompt' -AgentPid 4821 -AgeMinutes 2 `
-    -Prompt 'I mean the one with epub, translated to russian' `
-    -Said 'Ready to run the conversion — need your approval for the write.' -Tokens 194000
+    -Prompt 'the multi-page invoices lose their table headers' `
+    -Said 'Fix is ready — need your approval to write over the fixtures.' -Tokens 194000
 
 # Yellow: working, in this actual repo, so the PR pill resolves for real.
 New-DemoAgent -Origin 'VS Code' -Name 'claude-watcher-win-a7' `
@@ -171,11 +174,11 @@ New-DemoAgent -Origin 'Ubuntu' -Name 'api-gateway-c2' `
     -Prompt 'add the retry-after header to the 429 path' `
     -Said 'Added, with a test for the header on repeated 429s.' -Tokens 158000
 
-New-DemoAgent -Origin 'Terminal' -Name 'protectors-agents-b9' `
-    -Cwd (New-DemoRepo (Join-Path $repos 'protectors-agents') 'feat/016-reasoning-compat') `
+New-DemoAgent -Origin 'Terminal' -Name 'orders-service-b9' `
+    -Cwd (New-DemoRepo (Join-Path $repos 'orders-service') 'chore/bump-deps') `
     -Status 'idle' -AgentPid 7290 -AgeMinutes 31 `
-    -Prompt 'does the reasoning budget survive a tool call?' `
-    -Said 'It does — the budget is per-turn, so tool results do not reset it.' -Tokens 88000
+    -Prompt 'do the dependency bumps break the contract tests?' `
+    -Said 'All contract tests pass on the bumped versions.' -Tokens 88000
 
 New-DemoAgent -Origin 'VS Code' -Name 'dotfiles-e3' `
     -Cwd (New-DemoRepo (Join-Path $repos 'dotfiles') 'main') `

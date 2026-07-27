@@ -4,20 +4,34 @@ A tiny **system-tray** app that shows which running Claude Code agent needs you 
 at a glance, from anywhere on your desktop. The Windows sibling of
 [claude-watcher](https://github.com/AKharytonchyk/claude-watcher) (macOS).
 
+<p align="center">
+  <img src="docs/flyout.png" width="388" alt="The flyout listing five agents: one waiting on you, one working, three idle — each with its host app, branch, open PR and context-window pressure." />
+</p>
+
 - 🔴 **needs you** · 🟡 **working** · 🟢 **idle** — a traffic-light dot in the
-  notification area, full breakdown in the tooltip and a Fluent flyout.
+  notification area, full breakdown in the tooltip and a Fluent flyout. The header
+  badges double as filters: click one to hide that state.
 - Watches **both** Claude Code running natively (PowerShell/cmd) **and** inside
-  **WSL** distros, aggregated into one list and tagged by origin.
+  **WSL** distros, aggregated into one list and tagged by **hosting app** —
+  Terminal, VS Code, or the distro name.
+- Per agent: last intent, git branch, **open PR** (click to open it), and
+  context-window pressure that turns amber then red as it fills. Click a row to
+  bring its terminal or editor to the front.
 - **Local-first, read-only, no daemon, never steals focus.** Same principles as
   the macOS app — see [CONSTITUTION.md](CONSTITUTION.md) and [PRIVACY.md](PRIVACY.md).
 
-> **Status: pre-alpha.** The pure-logic **Core is complete and tested** (39 unit
-> tests). The whole solution — Core **and** the WinUI app — now **builds green on
-> CI** (`windows-latest`). What's left is **runtime** verification: the tray glyph,
-> flyout, WSL discovery, watcher, and window focus compile but haven't been run on
-> a real Windows desktop yet. Not a shippable app yet. See
+> *Screenshot uses invented demo data — reproduce it with
+> [`tools/demo-data.ps1`](tools/demo-data.ps1), which never reads your real
+> `~/.claude`.*
+
+> **Status: alpha.** The pure-logic **Core is complete and tested** (64 unit tests),
+> and the app has now been **run and verified on a real Windows 11 desktop** with
+> live native **and** WSL sessions: tray glyph, tooltip, flyout, host detection,
+> click-to-focus, PR lookup, filtering and the file watcher. Rough edges remain —
+> no installer, no first-run "pin the tray icon" nudge, and display scaling other
+> than 100% is unverified. See
 > [`specs/0001-windows-tray-mvp.md`](specs/0001-windows-tray-mvp.md) for the plan
-> and [AGENTS.md](AGENTS.md) for the per-file `tested` vs. `unverified` status.
+> and [AGENTS.md](AGENTS.md) for the per-file status.
 
 ## Stack
 
@@ -35,6 +49,14 @@ src/ClaudeWatcher/bin/x64/Debug/net10.0-windows10.0.19041.0/win-x64/ClaudeWatche
 Requires the .NET 10 SDK; the Windows App SDK comes in via NuGet and is carried
 in the app, so there is no workload or runtime to install. See
 [AGENTS.md](AGENTS.md) for the full build/run/verify loop and prerequisites.
+
+To see it populated without waiting for real agents:
+
+```powershell
+./tools/demo-data.ps1              # invented fleet, then launches the app
+./tools/demo-data.ps1 -Stress      # absurd names/branches and 14 agents
+./tools/check-layout.ps1           # assert nothing overlaps or leaves the screen
+```
 
 ## Data source
 
