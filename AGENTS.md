@@ -77,7 +77,8 @@ exercised on a real Windows 11 desktop with live native **and** WSL sessions ·
 | `ClaudeWatcher.Core/TranscriptReader.cs` | Last intent/said/token usage from the `.jsonl` transcript — tail read + carry-forward + rewrite detection | tested |
 | `ClaudeWatcher.Core/GitBranch.cs`        | Current branch from `.git/HEAD` | tested |
 | `ClaudeWatcher.Core/AgentView.cs` + `FleetBuilder.cs` | Enrich sessions → display-ready views + counts | tested |
-| `ClaudeWatcher.Core/DotGlyph.cs`         | Tray dot as a pure BGRA pixel buffer | tested |
+| `ClaudeWatcher.Core/DotGlyph.cs`         | Filled dot as a pure BGRA pixel buffer | tested |
+| `ClaudeWatcher.Core/TrayGlyph.cs`        | Per-state tray shapes (ring / rotating spark / alert), pure math | verified |
 | `ClaudeWatcher.Core/Roots/*`             | `IWatchRoot` seam (interface only; impls live in Platform) | tested (types) |
 | `ClaudeWatcher/Platform/Wsl.cs`          | `wsl.exe` distro list / `$HOME` / `\\wsl$` + `/mnt/<drive>` path translation | verified |
 | `ClaudeWatcher/Platform/WatchRoots.cs`   | Native + per-WSL-distro root discovery (the port's crux) | verified |
@@ -86,7 +87,7 @@ exercised on a real Windows 11 desktop with live native **and** WSL sessions ·
 | `ClaudeWatcher/Platform/ProcessTree.cs`    | One Toolhelp snapshot, walked up from a pid (pid + exe name) | verified |
 | `ClaudeWatcher/Platform/HostDetector.cs`   | Hosting app from the process tree ("Terminal" / "VS Code"), pid-keyed cache | verified |
 | `ClaudeWatcher/Platform/TerminalFocus.cs`  | Focus the hosting window (window-level, not tab) via Win32 | unverified |
-| `ClaudeWatcher/Platform/TrayIconRenderer.cs`| `DotGlyph` bytes → GDI HICON for the shell | verified |
+| `ClaudeWatcher/Platform/TrayIconRenderer.cs`| `TrayGlyph` bytes → GDI HICON for the shell | verified |
 | `ClaudeWatcher/Platform/PrChecker.cs`      | Optional open-PR lookup via `gh` (gated by `CWATCH_OFFLINE`) | **stub** |
 | `ClaudeWatcher/UI/FleetViewModel.cs`       | Observable snapshot the flyout binds to | verified |
 | `ClaudeWatcher/UI/Converters.cs`           | State→brush, ctx%→text, bool→visibility | verified |
@@ -144,9 +145,20 @@ See [SCHEMA.md](SCHEMA.md) for the full contract. Windows-specific:
 - **A WSL cwd is often on a Windows drive.** `/mnt/c/...` must map back to `C:\...`;
   reaching it as `\\wsl$\<Distro>\mnt\c\...` is a needless 9P round trip that fails
   often enough to blank out git/branch lookups.
-- **The tray glyph is image + tooltip only** — it can't render rich text like the
-  macOS menu bar's `● 1 ● 2`. Draw a single dominant-urgency dot; put the full
-  per-state breakdown in the tooltip and the flyout.
+- **The tray glyph is an image, not text.** There is no analogue of the macOS status
+  item's arbitrary-width view, so the menu bar's `● 1 ● 2` can't be reproduced as
+  text; the per-state breakdown belongs in the tooltip and the flyout. But the icon
+  itself is ours to draw, and it *is* animatable (`NIM_MODIFY` on a timer), so state
+  is carried by shape and motion — see `Core/TrayGlyph.cs`.
+- **16×16 is the design budget** (`SM_CXSMICON` at 100% scaling; 32 at 200%). Large
+  blocks of colour and one bold mark read; fine detail does not. Lettering ("zzz"),
+  texture ("matrix rain") and counting dots were all built, rendered at true size,
+  and rejected as illegible — motion survives where detail doesn't, which is why
+  "working" rotates. Prototype at true size before committing to a design; a zoomed
+  mock-up will lie to you.
+- **Anything that ticks continuously must stop when idle.** The tray animation runs
+  only while an agent is working (Constitution §3). It is the app's only such timer;
+  keep it that way.
 - **Never `git add -A`.** Stage explicit paths. `.claude/skills/` (the Spec Kit
   workflow) and `.specify/` **are** committed; `.claude/settings.local.json` and
   `.entire/` are local-only (gitignored).
