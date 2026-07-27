@@ -31,6 +31,9 @@ public partial class App : Application
     private TaskbarIcon? _tray;
     private FlyoutWindow? _flyout;
     private IntPtr _trayIcon;   // current tray HICON; we own it (see SetTrayIcon)
+    private DispatcherQueueTimer? _spin;
+    private AgentState? _dominant;
+    private int _frame;
 
     public App() => InitializeComponent();
 
@@ -95,27 +98,56 @@ public partial class App : Application
             _vm.Update(views, counts);
             if (_tray is not null)
             {
-                SetTrayIcon(counts.Dominant);
+                SetTrayIcon(counts.Dominant, _frame);
+                SetAnimation(counts.Dominant);
                 _tray.ToolTipText = $"Claude Watcher — {SummaryText.For(counts)}";
             }
         });
     }
 
     /// <summary>
-    /// Swap in a freshly drawn dot. We hand the shell a raw HICON (see
+    /// Swap in a freshly drawn glyph. We hand the shell a raw HICON (see
     /// <see cref="TrayIconRenderer"/>) and only release the previous handle once the
     /// replacement is in place, so the tray never points at a destroyed icon.
     /// </summary>
-    private void SetTrayIcon(AgentState? dominant)
+    private void SetTrayIcon(AgentState? dominant, int frame = 0)
     {
         if (_tray is null) return;
 
-        var icon = TrayIconRenderer.CreateDotIcon(dominant);
+        var icon = TrayIconRenderer.CreateStateIcon(dominant, frame);
         if (icon == IntPtr.Zero) return;
 
         _tray.TrayIcon.UpdateIcon(icon);
         if (_trayIcon != IntPtr.Zero) TrayIconRenderer.DestroyIcon(_trayIcon);
         _trayIcon = icon;
+    }
+
+    /// <summary>
+    /// Spin the spark while anything is working, and stop dead otherwise. This is the
+    /// only thing in the app that ticks continuously, so it must not run when there is
+    /// nothing to animate (Constitution §3) — idle and needs-you glyphs are static.
+    /// </summary>
+    private void SetAnimation(AgentState? dominant)
+    {
+        _dominant = dominant;
+
+        if (dominant != AgentState.Working)
+        {
+            _spin?.Stop();
+            return;
+        }
+
+        if (_spin is null)
+        {
+            _spin = _dispatcher.CreateTimer();
+            _spin.Interval = TimeSpan.FromMilliseconds(160);   // ~6 fps: legible, near-free
+            _spin.Tick += (_, _) =>
+            {
+                _frame = (_frame + 1) % TrayGlyph.Frames;
+                SetTrayIcon(_dominant, _frame);
+            };
+        }
+        if (!_spin.IsRunning) _spin.Start();
     }
 
     private void ToggleFlyout()
@@ -136,6 +168,7 @@ public partial class App : Application
 
     public void Quit()
     {
+        _spin?.Stop();
         _watcher?.Dispose();
         _tray?.Dispose();
         if (_trayIcon != IntPtr.Zero) TrayIconRenderer.DestroyIcon(_trayIcon);
