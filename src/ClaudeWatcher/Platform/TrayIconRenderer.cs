@@ -25,13 +25,15 @@ public static class TrayIconRenderer
     };
 
     /// <summary>
-    /// Build a tray-sized HICON for the dominant state. The caller owns the handle
-    /// and must <see cref="DestroyIcon"/> it once the shell has a replacement.
+    /// Build a tray-sized HICON for the dominant state: a hollow ring when idle, a
+    /// rotating spark while working, a bold exclamation when an agent needs you.
+    /// <paramref name="frame"/> advances the animation. The caller owns the handle and
+    /// must <see cref="DestroyIcon"/> it once the shell has a replacement.
     /// </summary>
-    public static IntPtr CreateDotIcon(AgentState? dominant)
+    public static IntPtr CreateStateIcon(AgentState? dominant, int frame = 0)
     {
         var size = SmallIconSize();
-        var bgra = DotGlyph.Bgra(size, HexFor(dominant));
+        var bgra = TrayGlyph.Bgra(size, TrayGlyph.For(dominant), HexFor(dominant), frame);
         Premultiply(bgra);
 
         var header = new BITMAPINFOHEADER
