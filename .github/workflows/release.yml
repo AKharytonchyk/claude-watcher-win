@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  # Lets a release be cut (or re-cut) without pushing another tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and release, e.g. v0.1.0'
+        required: true
+
+permissions:
+  contents: write        # needed to create the release and upload assets
+
+jobs:
+  build:
+    name: Publish ${{ matrix.rid }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            platform: x64
+          - rid: win-arm64
+            platform: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve version from the tag
+        id: v
+        shell: pwsh
+        run: |
+          $tag = '${{ github.event.inputs.tag }}'
+          if (-not $tag) { $tag = '${{ github.ref_name }}' }
+          $version = $tag.TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+') { throw "tag '$tag' is not vMAJOR.MINOR.PATCH" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag"         >> $env:GITHUB_OUTPUT
+
+      # The brain is platform-agnostic, so its tests gate every architecture.
+      - name: Test core
+        run: dotnet test tests/ClaudeWatcher.Core.Tests/ClaudeWatcher.Core.Tests.csproj -c Release
+
+      # Self-contained: carries both the .NET runtime and the Windows App SDK, so a
+      # target machine needs nothing installed. See AGENTS.md for why the
+      # framework-dependent shape is a trap here (missing DDLM ⇒ 0x80670016).
+      - name: Publish
+        run: >
+          dotnet publish src/ClaudeWatcher/ClaudeWatcher.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          -p:Platform=${{ matrix.platform }}
+          -p:Version=${{ steps.v.outputs.version }}
+          --self-contained true
+          -o publish/${{ matrix.rid }}
+
+      - name: Sanity-check the output
+        shell: pwsh
+        run: |
+          $exe = "publish/${{ matrix.rid }}/ClaudeWatcher.exe"
+          if (-not (Test-Path $exe)) { throw "no executable at $exe" }
+          # Self-contained means the runtime rides along; if this is missing, the zip
+          # would need .NET installed on the target and the claim in the README is false.
+          if (-not (Test-Path "publish/${{ matrix.rid }}/coreclr.dll")) { throw 'not self-contained' }
+          $mb = [math]::Round(((Get-ChildItem "publish/${{ matrix.rid }}" -Recurse -File | Measure-Object Length -Sum).Sum / 1MB))
+          Write-Host "$exe ok - $mb MB"
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          $name = "ClaudeWatcher-${{ steps.v.outputs.tag }}-${{ matrix.rid }}.zip"
+          Compress-Archive -Path "publish/${{ matrix.rid }}/*" -DestinationPath $name
+          Write-Host "$name $([math]::Round((Get-Item $name).Length / 1MB)) MB"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClaudeWatcher-${{ matrix.rid }}
+          path: '*.zip'
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ls -la dist
+
+          cat > notes.md <<'NOTES'
+          A tiny system-tray app showing which Claude Code agent needs you — across
+          native Windows sessions **and** WSL distros.
+
+          ### Install
+
+          Download the zip for your architecture, unblock it, extract anywhere, and run
+          `ClaudeWatcher.exe`. It lives in the notification area; there is no installer
+          and nothing to uninstall beyond deleting the folder.
+
+          Both builds are **self-contained**: the .NET runtime and the Windows App SDK
+          ride along, so there is no prerequisite to install. That is why they are large.
+
+          | file | for |
+          |---|---|
+          | `…-win-x64.zip` | Intel/AMD PCs |
+          | `…-win-arm64.zip` | Arm PCs (Snapdragon, Surface Pro X …) |
+
+          ### Not signed yet
+
+          The executables are unsigned, so Windows SmartScreen will warn on first run —
+          *More info → Run anyway*. Code signing is on the list.
+
+          ### Requires
+
+          Windows 10 19041+ or Windows 11, and Claude Code writing session files to
+          `~/.claude/sessions`.
+          NOTES
+
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.zip --repo "$REPO" --clobber
+          else
+            gh release create "$TAG" dist/*.zip \
+              --repo "$REPO" \
+              --title "Claude Watcher $TAG" \
+              --notes-file notes.md \
+              --prerelease
+          fi

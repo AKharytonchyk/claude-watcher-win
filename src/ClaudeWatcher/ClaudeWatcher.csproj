@@ -28,6 +28,11 @@
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Local builds carry this; the release workflow overrides it from the git tag. -->
+    <Version>0.1.0</Version>
+    <Product>Claude Watcher</Product>
+    <Authors>Artsiom Kharytonchyk</Authors>
+    <Copyright>© 2026 Artsiom Kharytonchyk</Copyright>
   </PropertyGroup>
 
   <!-- On net10 both former pins are gone: H.NotifyIcon 2.4+ requires net10 (it had
